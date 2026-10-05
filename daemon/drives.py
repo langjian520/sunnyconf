@@ -26,6 +26,20 @@ from openpilot.common.swaglog import cloudlog
 from . import auth
 
 REALDATA = Path("/data/media/0/realdata")
+
+
+def _ensure_tools_importable() -> None:
+  """`tools.lib.logreader` is an openpilot repo-internal package. On the old layout
+  (<root>/tools) the repo root is already on sys.path and this is a no-op; on the new
+  layout (v2026.003+, everything under <root>/openpilot/) the inner directory must be
+  added explicitly or the drives indexer fails on every qlog parse."""
+  import sys
+  root = Path(__file__).resolve().parents[2]
+  for cand in (root / "openpilot", root):
+    if (cand / "tools" / "lib" / "logreader.py").exists():
+      if str(cand) not in sys.path:
+        sys.path.insert(0, str(cand))
+      return
 _SEG_RE = re.compile(r"^([0-9a-f]{8}--[0-9a-f]{10})--(\d+)$")
 _ROUTE_RE = re.compile(r"^[0-9a-f]{8}--[0-9a-f]{10}$")
 
@@ -107,6 +121,7 @@ def _parse_segment(route: str, seg: int, seg_dir: Path) -> dict | None:
     qlog = seg_dir / "qlog.bz2"
     if not qlog.exists():
       return None
+  _ensure_tools_importable()
   from tools.lib.logreader import LogReader   # heavy import, only inside the indexer
 
   # NOTE on time: logMonoTime is monotonic across the whole ROUTE, and loggerd replays the route-start
