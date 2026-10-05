@@ -46,10 +46,16 @@ def repo_root() -> Path:
   # Walk up to the repo root (the dir that holds common/params_keys.h and sunnypilot/), so this is
   # robust to how deep this module is nested (e.g. sunnyconf/daemon/registry.py) and to being imported
   # through the openpilot/ symlink.
+  # sunnypilot v2026.003+ (new layout) moved ALL code under <repo>/openpilot/ while the sunnyconf
+  # submodule still sits at <repo>/sunnyconf/ — walking up from __file__ never passes the inner dir,
+  # so also probe each level's openpilot/ child before falling back (fixes a silent breakage where the
+  # SDUI (settings_ui.json) and the registry weren't found and /schema shrank to a bare Advanced group).
   here = Path(__file__).resolve()
   for parent in here.parents:
     if (parent / "common" / "params_keys.h").exists() and (parent / "sunnypilot").is_dir():
       return parent
+    if (parent / "openpilot" / "common" / "params_keys.h").exists() and (parent / "openpilot" / "sunnypilot").is_dir():
+      return parent / "openpilot"
   return here.parents[2]
 
 
