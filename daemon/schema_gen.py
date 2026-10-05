@@ -273,7 +273,11 @@ def _assemble(include_all: bool) -> tuple[dict, dict[str, IndexEntry]]:
   glist = []
   for gid in ordered_gids:
     if gid in custom and gid not in groups and gid not in subpanels:
-      glist.append(dict(custom[gid]))   # app-rendered page (e.g. Maps/OSM): no schema params, just the entry
+      g = dict(custom[gid])   # app-rendered page (e.g. Maps/OSM): no schema params, just the entry
+      ov_title = overrides.get("groups", {}).get(gid, {}).get("title")
+      if ov_title:
+        g["title"] = ov_title   # overrides win (e.g. 汉化), same precedence as _group_title for param groups
+      glist.append(g)
       continue
     glist.append({
       "id": gid,

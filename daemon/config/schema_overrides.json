@@ -14,6 +14,9 @@
   },
 
   "groups": {
+    "drives":    { "title": "行车记录" },
+    "osm":       { "title": "地图" },
+    "vehicle":   { "title": "车辆" },
     "sunnylink": { "title": "sunnylink", "order": 3 },
     "advanced":  { "title": "高级（自动检测）", "order": 99 }
   }
