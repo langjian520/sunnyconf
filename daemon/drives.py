@@ -40,6 +40,30 @@ def _ensure_tools_importable() -> None:
       if str(cand) not in sys.path:
         sys.path.insert(0, str(cand))
       return
+
+
+def _ensure_av_importable() -> None:
+  """`import av` (PyAV — FFmpeg bindings) remuxes HD HEVC segments into seekable MP4s for the app
+  player. The system venv (/usr/local/venv) is read-only and doesn't ship it, so HD playback 404s
+  forever if it's missing. If it's absent here, pick it up from the writable install dir
+  (/data/sunnyconf/pylibs, created with: pip install --target /data/sunnyconf/pylibs av)."""
+  import sys
+  try:
+    import av  # noqa: F401
+    return
+  except ImportError:
+    pass
+  d = Path("/data/sunnyconf/pylibs")
+  try:
+    if d.is_dir() and str(d) not in sys.path:
+      sys.path.insert(0, str(d))
+    import av  # noqa: F401
+    cloudlog.info("sunnyconf.drives: PyAV loaded from %s", d)
+  except Exception:
+    cloudlog.exception("sunnyconf.drives: PyAV unavailable — HD video remux will fail")
+
+
+_ensure_av_importable()
 _SEG_RE = re.compile(r"^([0-9a-f]{8}--[0-9a-f]{10})--(\d+)$")
 _ROUTE_RE = re.compile(r"^[0-9a-f]{8}--[0-9a-f]{10}$")
 
