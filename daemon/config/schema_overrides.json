@@ -2,8 +2,8 @@
   "_comment": "sunnyconf schema overrides — applied on top of the SDUI-derived schema (registry + settings_ui.json). Use for: keys not (yet) in settings_ui.json, offroad_only / requires_restart, title/description fixes, hiding internal keys, or group title/order. Per-param keys: title, description, type, options ([[value,label]]), min, max, step, unit, default, offroad_only, requires_restart, hidden, group, section. The 'groups' map sets per-group title/order.",
 
   "params": {
-    "SunnylinkEnabled":              { "group": "sunnylink", "title": "Enable sunnylink" },
-    "EnableSunnylinkUploader":       { "group": "sunnylink", "title": "Enable sunnylink Uploader" },
+    "SunnylinkEnabled":              { "group": "sunnylink", "title": "启用 sunnylink" },
+    "EnableSunnylinkUploader":       { "group": "sunnylink", "title": "启用 sunnylink 上传" },
 
     "OpenpilotEnabledToggle": { "requires_restart": true },
     "RecordFront":            { "requires_restart": true },
@@ -15,6 +15,6 @@
 
   "groups": {
     "sunnylink": { "title": "sunnylink", "order": 3 },
-    "advanced":  { "title": "Advanced (auto-detected)", "order": 99 }
+    "advanced":  { "title": "高级（自动检测）", "order": 99 }
   }
 }
