@@ -20,6 +20,9 @@ Endpoints:
   DELETE /params/<key>         -> remove an allowlisted EXTRA_KEYS param (the OSM flows need remove semantics)
   GET  /maps                   -> Maps/OSM page state: mapd version, size, download progress, selection
   GET  /maps/check             -> is the map-data server newer than our download? {update_available, ...}
+  GET  /mirror                 -> UI mirror (screen cast) state: {installed, enabled, streaming, port}
+                                  (on/off itself is PUT /params/UiMirrorEnabled; the video is NOT proxied
+                                  here — the client streams it straight off the add-on's own port)
   GET  /drives                 -> recorded routes (watcher-indexer runs continuously) + indexing progress
   GET  /drives/live            -> is a drive recording right now + started/elapsed/distance so far
   GET  /drives/<route>/track   -> merged GPS points + engagement bar + event markers (app-ready)
@@ -85,6 +88,12 @@ EXTRA_KEYS = {
   "OsmLocal":          {"type": "BOOL",   "w": True},    # "maps selected" flag (drives the update-required alert)
   "OsmDbUpdatesCheck": {"type": "BOOL",   "w": True},    # write true -> mapd_manager starts the download cycle
   "OsmDownloadedDate": {"type": "STRING", "w": False},   # unix ts written by mapd_manager ("Last checked …")
+  # UI mirror (screen cast) — the on/off switch behind the app's Mirror page. The mirror itself is a
+  # separate add-on (openpilot/tools/ui-mirror), so this is ONLY the toggle; see GET /mirror and _mirror().
+  # No onroad gate: the on-device switch (Settings -> Device -> "ui mirror") has none either, and the
+  # whole point of the page is to flip it from the phone. Writes are bound by clear_all()'s shadow copy
+  # in common/params.py — see apply_mirror_patch.py.
+  "UiMirrorEnabled":   {"type": "BOOL",   "w": True},
 }
 
 def _extra_coerce(et: str, val):
@@ -107,6 +116,12 @@ def _extra_coerce(et: str, val):
 
 # Offline OSM maps live here (same constant as the stock OSM panel); size + delete work on this tree.
 MAP_PATH = Path(Paths.mapd_root()) / "offline"
+
+# Where the ui-mirror web server listens (openpilot/tools/ui-mirror/web_server.py, served by the
+# ui-mirror-web.service unit). The app pulls the MJPEG straight off that port — the daemon only probes its
+# /health to report whether the add-on is installed and actually streaming. Override if you moved it
+# (UI_MIRROR_PORT on the device); defaults to the shipped value.
+MIRROR_PORT = int(os.environ.get("SUNNYCONF_MIRROR_PORT", "8000"))
 
 # mapd publishes its live download state to the mem-params root (see sunnypilot/mapd/mapd_manager.py):
 # OSMDownloadLocations non-empty == a download is in flight. Lazy so a dev machine without /dev/shm still imports.
@@ -563,6 +578,8 @@ class _Handler(BaseHTTPRequestHandler):
         return self._send(200, self._maps())
       if path == "/maps/check":
         return self._send(200, self._maps_check())
+      if path == "/mirror":
+        return self._send(200, self._mirror())
       if path == "/drives":
         progress = drives.ensure_indexing()   # make sure the watcher-indexer is alive
         return self._send(200, {"drives": drives.route_summaries(), "indexing": progress})
@@ -1079,6 +1096,41 @@ class _Handler(BaseHTTPRequestHandler):
     available = None if remote is None else (remote > downloaded)
     return {"ok": True, "update_available": available, "remote_date": remote, "downloaded_date": downloaded,
             "sampled": sampled}
+
+  def _mirror(self) -> dict:
+    """State for the app's Mirror page — is the ui-mirror add-on installed, is the toggle on, is it actually
+    pushing frames right now.
+
+    The mirror is a SEPARATE add-on (openpilot/tools/ui-mirror — a renderer patch plus an ffmpeg pipeline
+    that feeds a stdlib web server on MIRROR_PORT). None of it lives in this daemon, so there is nothing to
+    "enable" here beyond the UiMirrorEnabled param; the frames never pass through us either — the app opens
+    the MJPEG stream straight off MIRROR_PORT. That keeps this endpoint cheap (one 1.5s probe of a loopback
+    /health) and the video path free of a Python relay.
+
+      installed  the add-on answers on MIRROR_PORT at all (false -> page shows the install hint)
+      enabled    the UiMirrorEnabled param — what the switch reflects and writes
+      streaming  ffmpeg is attached to the mjpeg socket, i.e. frames are flowing (the toggle is on but this
+                 is false during the ~1s it takes ffmpeg to come up, and when the pipeline died)
+    """
+    enabled = False
+    try:
+      enabled = bool(self._params.get_bool("UiMirrorEnabled"))
+    except Exception:
+      pass   # no shadow copy yet / param never written -> off
+
+    installed = streaming = False
+    try:
+      import urllib.request
+      with urllib.request.urlopen("http://127.0.0.1:%d/health" % MIRROR_PORT, timeout=1.5) as r:
+        if r.status == 200:
+          installed = True
+          # "mjpeg_source=tcp://127.0.0.1:8554 connected=True" — the web server's own view of the pipeline
+          streaming = b"connected=True" in r.read()
+    except Exception:
+      pass   # add-on not installed, service down, or a different port -> installed stays False
+
+    return {"ok": True, "installed": installed, "enabled": enabled, "streaming": streaming,
+            "port": MIRROR_PORT, "stream_path": "/stream.mjpeg"}
 
   def _put_maps(self):
     """Set the country selection (multi): body {"countries": [{"ref","title"},...]}. Atomic generalization of

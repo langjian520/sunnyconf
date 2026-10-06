@@ -29,7 +29,7 @@ from .values import default_transport
 
 # fallback group ordering / titles for groups without an SDUI panel (e.g. sunnylink, advanced)
 _GROUP_ORDER = [
-  "device", "drives", "network", "sunnylink", "toggles", "software", "models", "steering",
+  "device", "drives", "mirror", "network", "sunnylink", "toggles", "software", "models", "steering",
   "cruise", "visuals", "display", "osm", "navigation", "trips", "vehicle",
   "firehose", "developer", "advanced",
 ]
@@ -38,11 +38,16 @@ _GROUP_ORDER = [
 # offers what this daemon actually supports. "maps" = the stock OSM offline-maps panel
 # (selfdrive/ui/sunnypilot/layouts/settings/osm.py), backed by GET /maps + the Osm* EXTRA_KEYS in server.py.
 # "drives" = the recorded-routes browser (UI first shipped as a mock; the route-listing endpoints follow).
+# "mirror" = the UI mirror (screen cast) page, backed by GET /mirror + the UiMirrorEnabled EXTRA_KEY. Unlike
+# the other two it has NO schema params at all — the whole feature is an add-on (openpilot/tools/ui-mirror)
+# and this entry exists so the page shows up in the nav only when the daemon knows about it.
 _CUSTOM_GROUPS = [
   # titled "Maps" (user preference) — the stock panel calls the same page "OSM"
   {"id": "osm", "title": "Maps", "icon": "map", "description": "", "custom": "maps",
    "params": [], "sub_panels": []},
   {"id": "drives", "title": "Drives", "icon": "route", "description": "", "custom": "drives",
+   "params": [], "sub_panels": []},
+  {"id": "mirror", "title": "Mirror", "icon": "cast", "description": "", "custom": "mirror",
    "params": [], "sub_panels": []},
 ]
 
